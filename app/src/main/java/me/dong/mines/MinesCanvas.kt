@@ -1,9 +1,8 @@
 package me.dong.mines
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +18,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.dong.mines.mines.Mines
 import kotlin.math.round
@@ -34,25 +32,31 @@ import kotlin.math.round
 //    Color(0xFF42A5F5),
 //)
 
-val COLOR_CELL_FLAG = Color(0xFF43B244)
+/** 正确标记地雷色 */
+val COLOR_MINES_FLAGGED = Color(0xFF43B244)
 
-/**
- * 已开单位颜色
- */
+/** 隐藏地雷色 */
+val COLOR_MINES_HIDDEN = Color(0xFFC864B4)
+
+/** 引爆地雷色 */
+val COLOR_MINES_BURST = Color(0xFFFF5050)
+
+/** 标记色 */
+val COLOR_CELL_FLAG = Color(0xFF29B7CB)
+
+/** 已开单位颜色 */
 val COLOR_CELL_REVEAL = Pair(
     Color(0xFFF7E8AA),
     Color(0xFFF9D27D),
 )
 
-val STYLE_TXT = TextStyle(fontSize = 18.sp)
-
-/**
- * 未开单位颜色
- */
+/** 未开单位颜色 */
 val COLOR_CELL_HIDDEN = Pair(
     Color(0xFFAE92FA),
     Color(0xFF9E82F0)
 )
+
+val STYLE_TXT = TextStyle(fontSize = 18.sp)
 
 /**
  * 绘制栅格
@@ -61,21 +65,15 @@ val COLOR_CELL_HIDDEN = Pair(
 fun MinesCanvas(modifier: Modifier = Modifier) {
     val col = Mines.col
     val row = Mines.row
-    var log by remember { mutableStateOf("???") }
-    var posTrans by remember {
-        mutableStateOf(
-            PositionTransformer(
-                col,
-                row,
-                Offset.Zero,
-                0f
-            )
-        )
-    }
+    var pts by remember { mutableStateOf(PositionTransformer(col, row, Offset.Zero, 0f)) }
     var downPosition by remember { mutableStateOf(Offset.Unspecified) }
     var downColRow by remember { mutableStateOf(INVALID_OFFSET) }
     var motionEvent by remember { mutableStateOf(MotionEvent.Idle) }
     val txtMeasurer = rememberTextMeasurer()
+    // 监听点击状态
+    // - 按下时记录行列位置
+    // - 移动时撤销记录
+    // - 松开时检查位置，错位则撤销记录
     val drawModifier = modifier
         .fillMaxSize()
         // 指针/手势事件
@@ -84,27 +82,19 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                 onDown = {
                     motionEvent = MotionEvent.Down
                     if (!it.position.isUnspecified) {
-                        downPosition = posTrans.cellPosition(it.position)
-                        downColRow = posTrans.colRow(downPosition)
-                        log = "${downColRow.x},${downColRow.y}"
+                        downPosition = pts.cellPosition(it.position)
+                        downColRow = pts.colRow(downPosition)
                     }
                     it.consume()
                 },
                 onMove = {
                     motionEvent = MotionEvent.Move
-//                    log = "move " + it.position
-//                    movePosition = it.position
+                    downPosition = Offset.Unspecified
+                    downColRow = INVALID_OFFSET
                     it.consume()
                 },
                 onUp = {
                     motionEvent = MotionEvent.Up
-                    if (!it.position.isUnspecified) {
-                        val upPos = posTrans.cellPosition(it.position)
-                        val upColRow = posTrans.colRow(upPos)
-                        if (upColRow ne downColRow)
-                            downColRow = INVALID_OFFSET
-                        log = "${upColRow.x},${upColRow.y}"
-                    }
                     it.consume()
                 },
                 delayAfterDownInMillis = 20L
@@ -119,8 +109,8 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         val boxSize = Size(boxWidth, round(cs * row))// 盒子大小
         val boxOffset = Offset(round(cs / 2), round(cs * 2f))// 盒子偏移量
         val txtOffset = Offset(round(cs / 3.5f), round(cs / 30))// 文本偏移量
-        if (boxOffset != posTrans.offset || cs != posTrans.cellSize) {
-            posTrans = PositionTransformer(row, col, boxOffset, cs)
+        if (boxOffset != pts.offset || cs != pts.cellSize) {
+            pts = PositionTransformer(row, col, boxOffset, cs)
         }
         //endregion
         //region 绘制栅格
@@ -133,7 +123,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                 translate(top = round(cs * y)) {
                     for (x in 0..<col) {
                         val cellOffset = Offset(round(cs * x), 0f)
-                        val cell = Mines.get(x, y)
+                        val cell = Mines[x, y]
                         if (!cell.isReveal()) {
                             //region: 画标记单位
                             if (cell.isFlagged()) {
@@ -152,25 +142,6 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                     color = COLOR_CELL_HIDDEN.second,
                                 )
                             }
-                            //region: 画行列数
-                            if (x < 1) {
-                                drawText(
-                                    textLayoutResult = txtMeasurer.measure(
-                                        text = (y % 10).toString(),
-                                        style = STYLE_TXT,
-                                    ),
-                                    topLeft = cellOffset + txtOffset,
-                                )
-                            } else if (y < 1) {
-                                drawText(
-                                    textLayoutResult = txtMeasurer.measure(
-                                        text = (x % 10).toString(),
-                                        style = STYLE_TXT,
-                                    ),
-                                    topLeft = cellOffset + txtOffset,
-                                )
-                            }
-                            //endregion
                             //endregion
                             continue
                         }// if (no reveal && flagged)
@@ -205,7 +176,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         //region: 计算点击命中单元
         if (downPosition.isUnspecified || !downPosition.isValid()) return@Canvas
         when (motionEvent) {
-            MotionEvent.Down, MotionEvent.Move -> {
+            MotionEvent.Down -> {
                 drawRect(
                     size = cellSize,
                     topLeft = downPosition,
@@ -214,38 +185,22 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
             }
 
             MotionEvent.Up -> {
-                motionEvent = MotionEvent.Idle
                 if (downColRow.isValid()) {
-//                        if (Mines.playing) {
-//                            Log.i("GridCanvas", "reveal(${downColRow.x},${downColRow.y})")
-//                            Mines.reveal(downColRow.x, downColRow.y)
-//                        } else {
-//                            Log.i("GridCanvas", "new game at(${downColRow.x},${downColRow.y})")
-//                            Mines.newGame(downColRow.x, downColRow.y)
-//                        }
+                    val (x, y) = downColRow
+                    if (Mines.playing) {
+                        Log.i("MinesCanvas", "try reveal(${x},${y})")
+                        Mines.reveal(x, y)
+                    } else {
+                        Log.i("MinesCanvas", "new game at(${x},${y})")
+                        Mines.newGame(x, y)
+                    }
                     downColRow = INVALID_OFFSET
                 }
+                motionEvent = MotionEvent.Idle
             }
 
             else -> Unit
         }
         //endregion
     }
-    Text(
-        text = log,
-        fontSize = 24.sp,
-        color = Color.White,
-        modifier = Modifier.padding(top = 30.dp, start = 20.dp)
-    )
 }
-
-/*// 绘制透明块时使用以下方式
-with(drawContext.canvas.nativeCanvas) {
-    val checkPoint = saveLayer(null, null)
-    drawRect(
-        size = cellSize,
-        color = Color.Transparent,
-        blendMode = BlendMode.Clear,
-    )
-    restoreToCount(checkPoint)
-}*/

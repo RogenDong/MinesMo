@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUnsignedTypes::class)
-
 package me.dong.mines.mines
 
 import android.util.Log
@@ -80,7 +78,7 @@ object Mines {
     /**
      * 获取单元格实例
      */
-    fun get(x: Int, y: Int): Cell {
+    operator fun get(x: Int, y: Int): Cell {
         if (!_playing) return EMPTY_CELL
         return rawMap[x, y]
     }
@@ -118,13 +116,21 @@ object Mines {
      * 揭开隐藏单元
      */
     fun reveal(x: Int, y: Int) {
+        val c = rawMap[x, y]
+        if (c.isMine()) {
+            rs.revealAllMines()
+            _playing = false
+            fetch()
+            return
+        }
         val count = rs.reveal(x, y)
+        if (count == 0) return
         if (count > 1) {
             fetch()
             return
         }
         update(x, y, Cell::reveal)
-//        isAllReveal()
+        isAllReveal()
     }
 
     /**

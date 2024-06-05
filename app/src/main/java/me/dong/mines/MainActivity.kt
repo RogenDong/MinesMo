@@ -21,19 +21,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-//        Log.i("app-jni", "invoke init()...")
-//        try {
-//            Mines.newMap(67, 13, 28)
-//        } catch (e: Exception) {
-//            Log.e("app-jni", "invoke jni fail !")
-//            Log.e("app-jni", "${e.message}\n${e.stackTrace}")
-//        }
+        Log.i("app-jni", "invoke init()...")
+        try {
+            Mines.newMap(67, 13, 28)
+        } catch (e: Exception) {
+            Log.e("app-jni", "invoke jni fail !")
+            Log.e("app-jni", "${e.message}\n${e.stackTrace}")
+        }
         setContent {
             minesTheme {
                 Scaffold {
                     Box(modifier = Modifier.background(Color.Black)) {
-//                        MinesCanvas()
-                        TouchGridCanvas(13, 28)
+                        MinesCanvas()
+//                        TouchGridCanvas(13, 28)
                     }
                 }
             }
