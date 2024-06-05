@@ -72,12 +72,22 @@ object Mines {
      */
     private fun fetch(keepStatus: Boolean = true) {
         val data = rs.fetch(keepStatus).drop(2).map(Byte::toUByte)
-        if (rawMap.isNotEmpty() && data.size == rawMap.size) {
-            for (i in data.indices) rawMap[i] = data[i]
+        if (rawMap.isEmpty() || data.size != rawMap.size) {
+            rawMap.clear()
+            rawMap.addAll(data)
             return
         }
-        rawMap.clear()
-        rawMap.addAll(data)
+        for (i in data.indices) {
+            val c = Cell(data[i])
+            if (c.isMine() && c.isReveal() && _status == GameStatus.Playing) {
+                _status = GameStatus.Exploded
+                val y = i / _width
+                val x = i % _width
+                _burst = IntOffset(x, y)
+            }
+            rawMap[i] = data[i]
+        }
+        isAllReveal()
     }
 
     /**
@@ -88,6 +98,11 @@ object Mines {
             GameStatus.ReadyNew, GameStatus.ReadyRetry -> EMPTY_CELL
             else -> rawMap[x, y]
         }
+    }
+
+    fun readyNew() {
+        _status = GameStatus.ReadyNew
+        _burst = INVALID_OFFSET
     }
 
     /**
@@ -128,10 +143,11 @@ object Mines {
     fun reveal(x: Int, y: Int) {
         val c = rawMap[x, y]
         if (c.isMine()) {
+            Log.d("app-jni", "reveal: burst at ($x,$y)")
             _status = GameStatus.Exploded
             _burst = IntOffset(x, y)
-            rs.revealAllMines()
-            fetch()
+//            rs.revealAllMines()
+//            fetch()
             return
         }
         val count = rs.reveal(x, y)
@@ -149,6 +165,8 @@ object Mines {
      */
     fun revealAround(x: Int, y: Int) {
         val count = rs.revealAround(x, y)
+        // TODO debug:没同步数据
+        Log.d("app-jni", "count reveal: $count")
         if (count > 0) fetch()
         // TODO find burst (x,y)
         isAllReveal()
