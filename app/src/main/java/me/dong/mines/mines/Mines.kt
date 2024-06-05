@@ -2,17 +2,22 @@ package me.dong.mines.mines
 
 import android.util.Log
 import androidx.annotation.Keep
+import androidx.compose.ui.unit.IntOffset
+import me.dong.mines.INVALID_OFFSET
 
 object Mines {
     val count get() = _count
     val col get() = _width
     val row get() = _height
-    val playing get() = _playing
-    private var _playing = false
-    private var _count: Int = 10
-    private var _width: Int = 10
-    private var _height: Int = 10
+    val status get() = _status
+    /** 引爆位置 */
+    val burstColRow get() = _burst
+    private var _count = 10
+    private var _width = 10
+    private var _height = 10
     private val rs = MinesJNI()
+    private var _burst = INVALID_OFFSET
+    private var _status = GameStatus.ReadyNew
     private val rawMap = ArrayList<UByte>(255 * 255)
 
     /**
@@ -53,7 +58,7 @@ object Mines {
      * @param height 高度/行数
      */
     fun newMap(count: Int, width: Int, height: Int) {
-        _playing = false
+        _status = GameStatus.ReadyNew
         this._count = count
         this._width = width
         this._height = height
@@ -79,15 +84,18 @@ object Mines {
      * 获取单元格实例
      */
     operator fun get(x: Int, y: Int): Cell {
-        if (!_playing) return EMPTY_CELL
-        return rawMap[x, y]
+        return when (_status) {
+            GameStatus.ReadyNew, GameStatus.ReadyRetry -> EMPTY_CELL
+            else -> rawMap[x, y]
+        }
     }
 
     /**
      * 洗牌，开始新回合
      */
     fun newGame(x: Int, y: Int) {
-        _playing = true
+        _status = GameStatus.Playing
+        _burst = INVALID_OFFSET
         rs.newGame(x, y)
         val count = rs.revealAround(x, y)
         fetch()
@@ -99,6 +107,8 @@ object Mines {
      * 重置进度：清除开关、标记状态
      */
     fun resetProgress() {
+        _status = GameStatus.ReadyRetry
+        _burst = INVALID_OFFSET
         rs.resetProgress()
         fetch()
     }
@@ -107,7 +117,7 @@ object Mines {
      * 切换标记
      */
     fun switchFlag(x: Int, y: Int) {
-        if (!_playing) return
+        if (_status != GameStatus.Playing) return
         rs.switchFlag(x, y)
         update(x, y, Cell::switchFlag)
     }
@@ -118,8 +128,9 @@ object Mines {
     fun reveal(x: Int, y: Int) {
         val c = rawMap[x, y]
         if (c.isMine()) {
+            _status = GameStatus.Exploded
+            _burst = IntOffset(x, y)
             rs.revealAllMines()
-            _playing = false
             fetch()
             return
         }
@@ -139,6 +150,7 @@ object Mines {
     fun revealAround(x: Int, y: Int) {
         val count = rs.revealAround(x, y)
         if (count > 0) fetch()
+        // TODO find burst (x,y)
         isAllReveal()
     }
 
@@ -146,7 +158,8 @@ object Mines {
      * 揭露所有地雷
      */
     fun revealAllMines() {
-        _playing = false
+        _status = GameStatus.Exploded
+//        _burst = INVALID_OFFSET
         rs.revealAllMines()
         fetch()
     }
@@ -156,7 +169,10 @@ object Mines {
      */
     fun isAllReveal(): Boolean {
         val all = rs.isAllReveal()
-        _playing = !all
+        if (all) {
+            _status = GameStatus.Swept
+            _burst = INVALID_OFFSET
+        }
         return all
     }
 
