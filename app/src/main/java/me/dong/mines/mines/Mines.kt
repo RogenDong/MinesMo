@@ -26,10 +26,20 @@ object Mines {
         return y * col + x
     }
 
+    /**
+     * @param x 列
+     * @param y 行
+     * @return 单元数据
+     */
     private operator fun List<UByte>.get(x: Int, y: Int): Cell {
         return Cell(this[y * col + x])
     }
 
+    /**
+     * @param x  列
+     * @param y  行
+     * @param fn 更新操作
+     */
     private fun update(x: Int, y: Int, fn: (Cell) -> Unit) {
         val i = index(x, y)
         val c = Cell(rawMap[i])

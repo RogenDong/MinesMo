@@ -12,6 +12,7 @@ val EMPTY_CELL = Cell(0u)
 /** 扫雷单元状态 */
 class Cell(var v: UByte = 0u) {
 
+    /** 周围地雷数量 */
     fun getWarn(): UByte {
         return v and BIT_WARN
     }
@@ -32,19 +33,12 @@ class Cell(var v: UByte = 0u) {
         return getWarn() < 1u
     }
 
-    fun bmp(add: Boolean) {
-        val n = getWarn()
-        if (add) {
-            if (n != BIT_WARN) v++
-        } else {
-            if (n > 0u) v--
-        }
-    }
-
+    /** 揭露该单元 */
     fun reveal() {
         v = v or BIT_REVEAL
     }
 
+    /** 反转标记状态 */
     fun switchFlag() {
         v = v xor BIT_FLAG
     }
