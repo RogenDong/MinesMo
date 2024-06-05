@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.unit.IntOffset
+import kotlin.math.floor
+import kotlin.math.round
 
 /**
  * 无效坐标
@@ -52,11 +54,11 @@ class PositionTransformer(
      */
     fun colRow(pos: Offset): IntOffset {
         if (pos.isUnspecified || !pos.isValid()) return INVALID_OFFSET
-        var tmp = pos - offset
-        Log.d("pos-trans", "pos - ofs = $tmp")
+        val tmp = Offset(
+            round((pos.x - offset.x) / cellSize),
+            round((pos.y - offset.y) / cellSize),
+        )
         if (tmp.x > width || tmp.y > height) return INVALID_OFFSET
-        tmp /= cellSize
-        // TODO y轴误差bug
         return IntOffset(tmp.x.toInt(), tmp.y.toInt())
     }
 
@@ -66,8 +68,15 @@ class PositionTransformer(
     fun cellPosition(pos: Offset): Offset {
         val cr = colRow(pos)
         if (!cr.isValid()) return Offset.Unspecified
-        Log.d("pos-trans", "col,row = $cr")
-        val mod = (pos - offset) % cellSize
-        return pos - mod
+//        Log.d("pos-trans", "col,row = $cr")
+//        val mod = Offset(
+//            round((pos.x - offset.x) % cellSize),
+//            round((pos.y - offset.y) % cellSize),
+//        )
+//        return pos - mod
+        return Offset(
+            pos.x - round((pos.x - offset.x) % cellSize),
+            pos.y - round((pos.y - offset.y) % cellSize),
+        )
     }
 }
