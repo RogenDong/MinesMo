@@ -19,6 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
+import me.dong.mines.mines.GameStatus
 import me.dong.mines.mines.Mines
 import kotlin.math.round
 
@@ -36,10 +37,10 @@ import kotlin.math.round
 val COLOR_MINES_FLAGGED = Color(0xFF43B244)
 
 /** 隐藏地雷色 */
-val COLOR_MINES_HIDDEN = Color(0xFFC864B4)
+val COLOR_MINES_HIDDEN = Color(0xFFFF5050)
 
 /** 引爆地雷色 */
-val COLOR_MINES_BURST = Color(0xFFFF5050)
+val COLOR_MINES_BURST = Color.Black
 
 /** 标记色 */
 val COLOR_CELL_FLAG = Color(0xFF29B7CB)
@@ -117,20 +118,78 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         translate(boxOffset.x, boxOffset.y) {
             // 大色块垫底
             drawRect(color = COLOR_CELL_HIDDEN.first, size = boxSize)
+            val (bx, by) = Mines.burstColRow
             //region: 小色块画出栅格
             var flag = 0
             for (y in 0..<row) {
                 translate(top = round(cs * y)) {
                     for (x in 0..<col) {
                         val cellOffset = Offset(round(cs * x), 0f)
+                        //region: 画爆炸点
+                        if (bx == x && by == y) {
+                            drawRect(
+                                size = cellSize,
+                                topLeft = cellOffset,
+                                color = COLOR_MINES_BURST,
+                            )
+                            continue
+                        }
+                        //endregion
                         val cell = Mines[x, y]
+                        //region: 通关时画出所有地雷
+                        if (Mines.status == GameStatus.Swept && cell.isMine()) {
+                            drawRect(
+                                color = COLOR_MINES_FLAGGED,
+                                topLeft = cellOffset,
+                                size = cellSize,
+                            )
+                            continue
+                        }
+                        //endregion
+                        //region: 画未打开的单位
                         if (!cell.isReveal()) {
                             //region: 画标记单位
                             if (cell.isFlagged()) {
+                                if (Mines.status == GameStatus.Exploded) {
+                                    if (cell.isMine()) {
+                                        //region: 画找到的地雷
+                                        drawRect(
+                                            size = cellSize,
+                                            topLeft = cellOffset,
+                                            color = COLOR_MINES_FLAGGED,
+                                        )
+                                        //endregion
+                                    } else {
+                                        //region: 画找错的单位
+                                        drawRect(
+                                            size = cellSize,
+                                            topLeft = cellOffset,
+                                            color = COLOR_MINES_HIDDEN,
+                                        )
+                                        drawText(
+                                            textLayoutResult = txtMeasurer.measure(
+                                                text = cell.getWarn().toString(),
+                                                style = STYLE_TXT,
+                                            ),
+                                            topLeft = cellOffset + txtOffset,
+                                        )
+                                        //endregion
+                                    }
+                                    continue
+                                }
                                 drawRect(
                                     size = cellSize,
                                     topLeft = cellOffset,
                                     color = COLOR_CELL_FLAG,
+                                )
+                            }
+                            //endregion
+                            //region: 画未找到的地雷
+                            else if (cell.isMine() && Mines.status == GameStatus.Exploded) {
+                                drawRect(
+                                    size = cellSize,
+                                    topLeft = cellOffset,
+                                    color = COLOR_MINES_HIDDEN,
                                 )
                             }
                             //endregion
@@ -145,7 +204,8 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                             //endregion
                             continue
                         }// if (no reveal && flagged)
-                        //region: 画已打开单位
+                        //endregion
+                        //region: 画已打开单位的颜色
                         val color = if ((x and 1) != flag)
                             COLOR_CELL_REVEAL.first
                         else COLOR_CELL_REVEAL.second
@@ -157,7 +217,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                         //endregion
                         //region: 写地雷值
                         val v = cell.getWarn().toInt()
-                        if (v < 1) continue
+                        if (v == 0) continue
                         drawText(
                             textLayoutResult = txtMeasurer.measure(
                                 text = v.toString(),
@@ -176,23 +236,28 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         //region: 计算点击命中单元
         if (downPosition.isUnspecified || !downPosition.isValid()) return@Canvas
         when (motionEvent) {
-            MotionEvent.Down -> {
-                drawRect(
-                    size = cellSize,
-                    topLeft = downPosition,
-                    color = COLOR_CELL_FLAG,
-                )
-            }
-
             MotionEvent.Up -> {
                 if (downColRow.isValid()) {
                     val (x, y) = downColRow
-                    if (Mines.playing) {
-                        Log.i("MinesCanvas", "try reveal(${x},${y})")
-                        Mines.reveal(x, y)
-                    } else {
-                        Log.i("MinesCanvas", "new game at(${x},${y})")
-                        Mines.newGame(x, y)
+                    when (Mines.status) {
+                        GameStatus.Playing -> {
+                            val c = Mines[x, y]
+                            if (c.isReveal()) Mines.revealAround(x, y)
+                            else Mines.reveal(x, y)
+                        }
+
+                        GameStatus.ReadyRetry -> {
+                            // TODO implement retry
+                        }
+
+                        GameStatus.ReadyNew -> {
+                            Log.i("MinesCanvas", "new game at(${x},${y})")
+                            Mines.newGame(x, y)
+                        }
+
+                        GameStatus.Swept, GameStatus.Exploded -> Mines.readyNew()
+
+                        else -> Unit
                     }
                     downColRow = INVALID_OFFSET
                 }
