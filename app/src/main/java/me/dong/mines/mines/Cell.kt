@@ -7,15 +7,10 @@ const val BIT_FLAG: UByte = 0x40u
 /** 位标识：周围地雷数 */
 const val BIT_WARN: UByte = 0x1Fu
 
-val EMPTY_CELL = Cell(0)
+val EMPTY_CELL = Cell(0u)
 
 /** 扫雷单元状态 */
-class Cell(v: Byte) {
-    var v: UByte = 0u
-
-    init {
-        this.v = v.toUByte()
-    }
+class Cell(var v: UByte = 0u) {
 
     fun getWarn(): UByte {
         return v and BIT_WARN

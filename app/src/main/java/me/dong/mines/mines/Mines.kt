@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package me.dong.mines.mines
 
 import android.util.Log
@@ -13,10 +15,26 @@ object Mines {
     private var _width: Int = 10
     private var _height: Int = 10
     private val rs = MinesJNI()
-    private val rawMap = ArrayList<Cell>(255 * 255)
+    private val rawMap = ArrayList<UByte>(255 * 255)
 
+    /**
+     * @param x 列
+     * @param y 行
+     * @return 下标
+     */
     private fun index(x: Int, y: Int): Int {
         return y * col + x
+    }
+
+    private operator fun List<UByte>.get(x: Int, y: Int): Cell {
+        return Cell(this[y * col + x])
+    }
+
+    private fun update(x: Int, y: Int, fn: (Cell) -> Unit) {
+        val i = index(x, y)
+        val c = Cell(rawMap[i])
+        fn(c)
+        rawMap[i] = c.v
     }
 
     /**
@@ -38,20 +56,15 @@ object Mines {
      * 同步数据
      *
      * @param keepStatus 是否包含状态信息（是否揭露、标记）
-     * @param clearCache 缓存是否清空充填
      */
-    private fun fetch(keepStatus: Boolean = true, clearCache: Boolean = false) {
-        val data = rs.fetch(keepStatus)
-        if (rawMap.isNotEmpty() && !clearCache) {
-            for (i in 2 until data.size) {
-                rawMap[i - 2] = Cell(data[i])
-            }
+    private fun fetch(keepStatus: Boolean = true) {
+        val data = rs.fetch(keepStatus).drop(2).map(Byte::toUByte)
+        if (rawMap.isNotEmpty() && data.size == rawMap.size) {
+            for (i in data.indices) rawMap[i] = data[i]
             return
         }
         rawMap.clear()
-        for (i in 2 until data.size) {
-            rawMap.add(Cell(data[i]))
-        }
+        rawMap.addAll(data)
     }
 
     /**
@@ -59,8 +72,7 @@ object Mines {
      */
     fun get(x: Int, y: Int): Cell {
         if (!_playing) return EMPTY_CELL
-        val i = index(x, y)
-        return rawMap[i]
+        return rawMap[x, y]
     }
 
     /**
@@ -70,7 +82,7 @@ object Mines {
         _playing = true
         rs.newGame(x, y)
         val count = rs.revealAround(x, y)
-        fetch(clearCache = true)
+        fetch()
         Log.i("app-jni", "newGame: count reveal cells: $count")
         Log.d("app-jni", formatString())
     }
@@ -80,7 +92,7 @@ object Mines {
      */
     fun resetProgress() {
         rs.resetProgress()
-        fetch(clearCache = true)
+        fetch()
     }
 
     /**
@@ -89,8 +101,7 @@ object Mines {
     fun switchFlag(x: Int, y: Int) {
         if (!_playing) return
         rs.switchFlag(x, y)
-        val i = index(x, y)
-        rawMap[i].switchFlag()
+        update(x, y, Cell::switchFlag)
     }
 
     /**
@@ -102,8 +113,7 @@ object Mines {
             fetch()
             return
         }
-        val i = index(x, y)
-        rawMap[i].reveal()
+        update(x, y, Cell::reveal)
 //        isAllReveal()
     }
 
