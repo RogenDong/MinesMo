@@ -2,21 +2,17 @@ package me.dong.mines.mines
 
 import android.util.Log
 import androidx.annotation.Keep
-import androidx.compose.ui.unit.IntOffset
-import me.dong.mines.INVALID_OFFSET
 
 object Mines {
     val count get() = _count
     val col get() = _width
     val row get() = _height
     val status get() = _status
-    /** 引爆位置 */
-    val burstColRow get() = _burst
     private var _count = 10
     private var _width = 10
     private var _height = 10
     private val rs = MinesJNI()
-    private var _burst = INVALID_OFFSET
+    private val burstSet = HashSet<Int>()
     private var _status = GameStatus.ReadyNew
     private val rawMap = ArrayList<UByte>(255 * 255)
 
@@ -25,18 +21,14 @@ object Mines {
      * @param y 行
      * @return 下标
      */
-    private fun index(x: Int, y: Int): Int {
-        return y * col + x
-    }
+    private fun index(x: Int, y: Int) = y * col + x
 
     /**
      * @param x 列
      * @param y 行
      * @return 单元数据
      */
-    private operator fun List<UByte>.get(x: Int, y: Int): Cell {
-        return Cell(this[y * col + x])
-    }
+    private operator fun List<UByte>.get(x: Int, y: Int) = Cell(this[y * col + x])
 
     /**
      * @param x  列
@@ -50,6 +42,8 @@ object Mines {
         rawMap[i] = c.v
     }
 
+    fun isBurst(x: Int, y: Int) = burstSet.contains(index(x, y))
+
     /**
      * 初始化地图
      *
@@ -59,6 +53,7 @@ object Mines {
      */
     fun newMap(count: Int, width: Int, height: Int) {
         _status = GameStatus.ReadyNew
+        burstSet.clear()
         this._count = count
         this._width = width
         this._height = height
@@ -81,9 +76,7 @@ object Mines {
             val c = Cell(data[i])
             if (c.isMine() && c.isReveal() && _status == GameStatus.Playing) {
                 _status = GameStatus.Exploded
-                val y = i / _width
-                val x = i % _width
-                _burst = IntOffset(x, y)
+                burstSet.add(i)
             }
             rawMap[i] = data[i]
         }
@@ -102,7 +95,7 @@ object Mines {
 
     fun readyNew() {
         _status = GameStatus.ReadyNew
-        _burst = INVALID_OFFSET
+        burstSet.clear()
     }
 
     /**
@@ -110,7 +103,7 @@ object Mines {
      */
     fun newGame(x: Int, y: Int) {
         _status = GameStatus.Playing
-        _burst = INVALID_OFFSET
+        burstSet.clear()
         rs.newGame(x, y)
         val count = rs.revealAround(x, y)
         fetch()
@@ -123,7 +116,7 @@ object Mines {
      */
     fun resetProgress() {
         _status = GameStatus.ReadyRetry
-        _burst = INVALID_OFFSET
+        burstSet.clear()
         rs.resetProgress()
         fetch()
     }
@@ -145,7 +138,7 @@ object Mines {
         if (c.isMine()) {
             Log.d("app-jni", "reveal: burst at ($x,$y)")
             _status = GameStatus.Exploded
-            _burst = IntOffset(x, y)
+            burstSet.add(index(x, y))
 //            rs.revealAllMines()
 //            fetch()
             return
@@ -164,8 +157,14 @@ object Mines {
      * 揭开周围一圈
      */
     fun revealAround(x: Int, y: Int) {
+        val cfa = rs.countFlaggedAround(x, y)
+        Log.d("app-jni", "count flagged around: $cfa")
+        if (cfa == 0) return
+        val cell = rawMap[x, y]
+        Log.d("app-jni", "cell warn: ${cell.getWarn()}")
+        if (cfa < cell.getWarn().toInt()) return
+
         val count = rs.revealAround(x, y)
-        // TODO debug:没同步数据
         Log.d("app-jni", "count reveal: $count")
         if (count > 0) fetch()
         // TODO find burst (x,y)
@@ -189,7 +188,7 @@ object Mines {
         val all = rs.isAllReveal()
         if (all) {
             _status = GameStatus.Swept
-            _burst = INVALID_OFFSET
+            burstSet.clear()
         }
         return all
     }
@@ -246,6 +245,9 @@ class MinesJNI {
      */
     external fun revealAround(x: Int, y: Int): Int
 
+    /** 统计周围标记数 */
+    external fun countFlaggedAround(x: Int, y: Int): Int
+
     /**
      * 揭露所有地雷
      */
@@ -256,10 +258,16 @@ class MinesJNI {
      */
     external fun isAllReveal(): Boolean
 
+    /** 统计全局标记数 */
+    external fun countFlagged(): Int
+
     /**
      * 获取地图的格式化字符串
      */
     external fun formatString(): String?
+
+    /** 获取状态数据格式化字符串 */
+    external fun formatStatusString(): String?
 
     /**
      * 同步数据
