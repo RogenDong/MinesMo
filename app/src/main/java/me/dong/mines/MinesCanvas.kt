@@ -42,6 +42,9 @@ val COLOR_MINES_HIDDEN = Color(0xFFFF5050)
 /** 引爆地雷色 */
 val COLOR_MINES_BURST = Color.Black
 
+/** 找错标记色 */
+val COLOR_CELL_WRONG = Color.White
+
 /** 标记色 */
 val COLOR_CELL_FLAG = Color(0xFF29B7CB)
 
@@ -118,7 +121,6 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         translate(boxOffset.x, boxOffset.y) {
             // 大色块垫底
             drawRect(color = COLOR_CELL_HIDDEN.first, size = boxSize)
-            val (bx, by) = Mines.burstColRow
             //region: 小色块画出栅格
             var flag = 0
             for (y in 0..<row) {
@@ -126,7 +128,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                     for (x in 0..<col) {
                         val cellOffset = Offset(round(cs * x), 0f)
                         //region: 画爆炸点
-                        if (bx == x && by == y) {
+                        if (Mines.isBurst(x, y)) {
                             drawRect(
                                 size = cellSize,
                                 topLeft = cellOffset,
@@ -164,7 +166,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                         drawRect(
                                             size = cellSize,
                                             topLeft = cellOffset,
-                                            color = COLOR_MINES_HIDDEN,
+                                            color = COLOR_CELL_WRONG,
                                         )
                                         drawText(
                                             textLayoutResult = txtMeasurer.measure(
@@ -243,7 +245,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                         GameStatus.Playing -> {
                             val c = Mines[x, y]
                             if (c.isReveal()) Mines.revealAround(x, y)
-                            else Mines.reveal(x, y)
+                            else Mines.switchFlag(x, y)
                         }
 
                         GameStatus.ReadyRetry -> {
