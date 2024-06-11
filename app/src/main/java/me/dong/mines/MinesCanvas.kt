@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,6 +63,8 @@ val COLOR_CELL_HIDDEN = Pair(
 
 val STYLE_TXT = TextStyle(fontSize = 18.sp)
 
+private val TAG = "ui"
+
 /**
  * 绘制栅格
  */
@@ -70,9 +73,11 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
     val col = Mines.col
     val row = Mines.row
     var pts by remember { mutableStateOf(PositionTransformer(col, row, Offset.Zero, 0f)) }
-    var downPosition by remember { mutableStateOf(Offset.Unspecified) }
+//    var downPosition by remember { mutableStateOf(Offset.Unspecified) }
     var downColRow by remember { mutableStateOf(INVALID_OFFSET) }
     var motionEvent by remember { mutableStateOf(MotionEvent.Idle) }
+    var downTime by remember { mutableLongStateOf(Long.MAX_VALUE) }
+    var pressOn by remember { mutableStateOf(false) }
     val txtMeasurer = rememberTextMeasurer()
     // 监听点击状态
     // - 按下时记录行列位置
@@ -85,20 +90,27 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
             detectMotionEvents(
                 onDown = {
                     motionEvent = MotionEvent.Down
-                    if (!it.position.isUnspecified) {
-                        downPosition = pts.cellPosition(it.position)
-                        downColRow = pts.colRow(downPosition)
+                    if (!it.position.invalid()) {
+                        downColRow = pts.colRow(it.position)
+                        downTime = System.currentTimeMillis()
+                        // TODO 长按n秒后轻轻震动
                     }
                     it.consume()
                 },
                 onMove = {
                     motionEvent = MotionEvent.Move
-                    downPosition = Offset.Unspecified
+//                    downPosition = Offset.Unspecified
                     downColRow = INVALID_OFFSET
+                    downTime = Long.MAX_VALUE
+                    pressOn = false
                     it.consume()
                 },
                 onUp = {
                     motionEvent = MotionEvent.Up
+                    if (!it.position.invalid()) {
+                        pressOn = System.currentTimeMillis() - downTime > 2000
+                        Log.d(TAG, "press on now")
+                    }
                     it.consume()
                 },
                 delayAfterDownInMillis = 20L
@@ -236,38 +248,31 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         }// translate(boxOffset.x, boxOffset.y)
         //endregion
         //region: 计算点击命中单元
-        if (downPosition.isUnspecified || !downPosition.isValid()) return@Canvas
-        when (motionEvent) {
-            MotionEvent.Up -> {
-                if (downColRow.isValid()) {
-                    val (x, y) = downColRow
-                    when (Mines.status) {
-                        GameStatus.Playing -> {
-                            val c = Mines[x, y]
-                            if (c.isReveal()) Mines.revealAround(x, y)
-                            else Mines.switchFlag(x, y)
-                        }
-
-                        GameStatus.ReadyRetry -> {
-                            // TODO implement retry
-                        }
-
-                        GameStatus.ReadyNew -> {
-                            Log.i("MinesCanvas", "new game at(${x},${y})")
-                            Mines.newGame(x, y)
-                        }
-
-                        GameStatus.Swept, GameStatus.Exploded -> Mines.readyNew()
-
-                        else -> Unit
-                    }
-                    downColRow = INVALID_OFFSET
-                }
-                motionEvent = MotionEvent.Idle
+        if (!downColRow.isValid() || motionEvent != MotionEvent.Up) return@Canvas
+        val (x, y) = downColRow
+        when (Mines.status) {
+            GameStatus.Playing -> {
+                val c = Mines[x, y]
+                if (c.isReveal()) Mines.revealAround(x, y)
+                else if (pressOn) Mines.reveal(x, y)
+                else Mines.switchFlag(x, y)
             }
 
-            else -> Unit
+            GameStatus.ReadyRetry -> {
+                // TODO implement retry
+            }
+
+            GameStatus.ReadyNew -> {
+                Log.i("MinesCanvas", "new game at(${x},${y})")
+                Mines.newGame(x, y)
+            }
+
+            GameStatus.Swept, GameStatus.Exploded -> Mines.readyNew()
         }
+        motionEvent = MotionEvent.Idle
+        downColRow = INVALID_OFFSET
+        downTime = Long.MAX_VALUE
+        pressOn = false
         //endregion
     }
 }
