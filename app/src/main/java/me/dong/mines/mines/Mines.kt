@@ -8,6 +8,7 @@ object Mines {
     val col get() = _width
     val row get() = _height
     val status get() = _status
+    private var initLogger = false
     private var _count = 10
     private var _width = 10
     private var _height = 10
@@ -52,6 +53,10 @@ object Mines {
      * @param height 高度/行数
      */
     fun newMap(count: Int, width: Int, height: Int) {
+        if (!initLogger) {
+            initLogger = true
+            rs.initLogger()
+        }
         _status = GameStatus.ReadyNew
         burstSet.clear()
         this._count = count
@@ -208,6 +213,8 @@ class MinesJNI {
             System.loadLibrary("mmrs")
         }
     }
+
+    external fun initLogger()
 
     /**
      * 初始化地图大小
