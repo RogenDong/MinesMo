@@ -2,6 +2,8 @@ package me.dong.mines
 
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isFinite
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.floor
@@ -15,20 +17,18 @@ val INVALID_OFFSET = IntOffset(-1, -1)
 /**
  * （浮点数）坐标是否有效
  */
-fun Offset.isValid(): Boolean {
-    return this.x >= 0 && this.y >= 0
-}
+fun Offset.invalid() = isUnspecified
+        || !isValid()
+        || !isFinite
+        || x < 0
+        || y < 0
 
 /**
  * （整数）坐标是否有效
  */
-fun IntOffset.isValid(): Boolean {
-    return this.x >= 0 && this.y >= 0
-}
+fun IntOffset.isValid() = x >= 0 && y >= 0
 
-infix fun IntOffset.ne(other: IntOffset): Boolean {
-    return x != other.x || y != other.y
-}
+infix fun IntOffset.ne(other: IntOffset) = x != other.x || y != other.y
 
 /**
  * 坐标转换工具
@@ -45,6 +45,7 @@ class PositionTransformer(
 ) {
     private val width = cellSize * col
     private val height = cellSize * row
+
     init {
         Log.d("pos-trans", "width: $width, height: $height")
     }
@@ -54,29 +55,33 @@ class PositionTransformer(
      */
     fun colRow(pos: Offset): IntOffset {
         if (pos.isUnspecified || !pos.isValid()) return INVALID_OFFSET
-        val tmp = Offset(
-            round((pos.x - offset.x) / cellSize),
-            round((pos.y - offset.y) / cellSize),
-        )
-        if (tmp.x > width || tmp.y > height) return INVALID_OFFSET
-        return IntOffset(tmp.x.toInt(), tmp.y.toInt())
+        var (x, y) = pos - offset
+        if (x < 0 || y < 0) return INVALID_OFFSET
+        x -= round(x % cellSize)
+        y -= round(y % cellSize)
+        if (x > width || y > height) return INVALID_OFFSET
+        x = round(x / cellSize)
+        y = round(y / cellSize)
+        if (x > width || y > height) return INVALID_OFFSET
+        return IntOffset(x.toInt(), y.toInt())
     }
 
     /**
      * 获取目标位置所在单元格的起始坐标
      */
     fun cellPosition(pos: Offset): Offset {
-        val cr = colRow(pos)
-        if (!cr.isValid()) return Offset.Unspecified
+        if (pos.isUnspecified || !pos.isValid()) return Offset.Unspecified
+        val (x, y) = pos - offset
+        if (x < 0 || x > width || y < 0 || y > height) return Offset.Unspecified
 //        Log.d("pos-trans", "col,row = $cr")
 //        val mod = Offset(
-//            round((pos.x - offset.x) % cellSize),
-//            round((pos.y - offset.y) % cellSize),
+//            round(x % cellSize),
+//            round(y % cellSize),
 //        )
 //        return pos - mod
         return Offset(
-            pos.x - round((pos.x - offset.x) % cellSize),
-            pos.y - round((pos.y - offset.y) % cellSize),
+            pos.x - round(x % cellSize),
+            pos.y - round(y % cellSize),
         )
     }
 }
