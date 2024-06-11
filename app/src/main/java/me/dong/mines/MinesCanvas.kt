@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import me.dong.mines.mines.GameStatus
 import me.dong.mines.mines.Mines
 import kotlin.math.round
+
+private const val TAG = "ui"
 
 //val LIST_COLOR = arrayOf(
 //    Color(0xFF43B244),
@@ -35,19 +36,31 @@ import kotlin.math.round
 //)
 
 /** 正确标记地雷色 */
-val COLOR_MINES_FLAGGED = Color(0xFF43B244)
+val COLOR_MINES_FLAGGED = Pair(
+    Color(0xFF43B244),
+    Color(0xFF33B134),
+)
 
 /** 隐藏地雷色 */
-val COLOR_MINES_HIDDEN = Color(0xFFFF5050)
+val COLOR_MINES_HIDDEN = Pair(
+    Color(0xFFFF5050),
+    Color(0xFFFE4040),
+)
 
 /** 引爆地雷色 */
 val COLOR_MINES_BURST = Color.Black
 
 /** 找错标记色 */
-val COLOR_CELL_WRONG = Color.White
+val COLOR_CELL_WRONG = Pair(
+    Color(0xFF989898),
+    Color(0xFF888888),
+)
 
 /** 标记色 */
-val COLOR_CELL_FLAG = Color(0xFF29B7CB)
+val COLOR_CELL_FLAG = Pair(
+    Color(0xFF29B7CB),
+    Color(0xFF19A7CA),
+)
 
 /** 已开单位颜色 */
 val COLOR_CELL_REVEAL = Pair(
@@ -61,9 +74,10 @@ val COLOR_CELL_HIDDEN = Pair(
     Color(0xFF9E82F0)
 )
 
+val STYLE_WRONG = TextStyle(fontSize = 18.sp, color = Color.White)
 val STYLE_TXT = TextStyle(fontSize = 18.sp)
 
-private val TAG = "ui"
+private operator fun <V> Pair<V, V>.get(b: Int, f: Int) = if (b and 1 != f) first else second
 
 /**
  * 绘制栅格
@@ -74,10 +88,11 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
     val row = Mines.row
     var pts by remember { mutableStateOf(PositionTransformer(col, row, Offset.Zero, 0f)) }
 //    var downPosition by remember { mutableStateOf(Offset.Unspecified) }
-    var downColRow by remember { mutableStateOf(INVALID_OFFSET) }
     var motionEvent by remember { mutableStateOf(MotionEvent.Idle) }
+    var downColRow by remember { mutableStateOf(INVALID_OFFSET) }
     var downTime by remember { mutableLongStateOf(Long.MAX_VALUE) }
     var pressOn by remember { mutableStateOf(false) }
+    val wrongTxtMeasurer = rememberTextMeasurer()
     val txtMeasurer = rememberTextMeasurer()
     // 监听点击状态
     // - 按下时记录行列位置
@@ -107,10 +122,11 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                 },
                 onUp = {
                     motionEvent = MotionEvent.Up
-                    if (!it.position.invalid()) {
-                        pressOn = System.currentTimeMillis() - downTime > 2000
-                        Log.d(TAG, "press on now")
-                    }
+                    if (it.position.invalid()) {
+                        downColRow = INVALID_OFFSET
+                        downTime = Long.MAX_VALUE
+                        pressOn = false
+                    } else pressOn = System.currentTimeMillis() - downTime > 1000
                     it.consume()
                 },
                 delayAfterDownInMillis = 20L
@@ -153,7 +169,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                         //region: 通关时画出所有地雷
                         if (Mines.status == GameStatus.Swept && cell.isMine()) {
                             drawRect(
-                                color = COLOR_MINES_FLAGGED,
+                                color = COLOR_MINES_FLAGGED[x, flag],
                                 topLeft = cellOffset,
                                 size = cellSize,
                             )
@@ -170,7 +186,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                         drawRect(
                                             size = cellSize,
                                             topLeft = cellOffset,
-                                            color = COLOR_MINES_FLAGGED,
+                                            color = COLOR_MINES_FLAGGED[x, flag],
                                         )
                                         //endregion
                                     } else {
@@ -178,12 +194,12 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                         drawRect(
                                             size = cellSize,
                                             topLeft = cellOffset,
-                                            color = COLOR_CELL_WRONG,
+                                            color = COLOR_CELL_WRONG[x, flag],
                                         )
                                         drawText(
-                                            textLayoutResult = txtMeasurer.measure(
+                                            textLayoutResult = wrongTxtMeasurer.measure(
                                                 text = cell.getWarn().toString(),
-                                                style = STYLE_TXT,
+                                                style = STYLE_WRONG,
                                             ),
                                             topLeft = cellOffset + txtOffset,
                                         )
@@ -194,7 +210,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                 drawRect(
                                     size = cellSize,
                                     topLeft = cellOffset,
-                                    color = COLOR_CELL_FLAG,
+                                    color = COLOR_CELL_FLAG[x, flag],
                                 )
                             }
                             //endregion
@@ -203,7 +219,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                 drawRect(
                                     size = cellSize,
                                     topLeft = cellOffset,
-                                    color = COLOR_MINES_HIDDEN,
+                                    color = COLOR_MINES_HIDDEN[x, flag],
                                 )
                             }
                             //endregion
@@ -220,13 +236,10 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                         }// if (no reveal && flagged)
                         //endregion
                         //region: 画已打开单位的颜色
-                        val color = if ((x and 1) != flag)
-                            COLOR_CELL_REVEAL.first
-                        else COLOR_CELL_REVEAL.second
                         drawRect(
+                            color = COLOR_CELL_REVEAL[x, flag],
                             topLeft = cellOffset,
                             size = cellSize,
-                            color = color,
                         )
                         //endregion
                         //region: 写地雷值
@@ -243,11 +256,11 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                     }// for (x in 0..<col)
                 }// translate(top = cs * y)
                 flag = if (flag == 0) 1 else 0
-            }//// for (y in 0..<row)
+            }// for (y in 0..<row)
             //endregion
         }// translate(boxOffset.x, boxOffset.y)
         //endregion
-        //region: 计算点击命中单元
+        //region: 计算点击命中单元、绘制点击栅格
         if (!downColRow.isValid() || motionEvent != MotionEvent.Up) return@Canvas
         val (x, y) = downColRow
         when (Mines.status) {
