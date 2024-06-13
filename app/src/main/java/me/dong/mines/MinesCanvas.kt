@@ -134,7 +134,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
         }
 
     Canvas(modifier = drawModifier) {
-        //region 计算宽高
+        //region: 计算宽高
         val cs = round(size.width / (col + 1))
         val boxWidth = round(cs * col) // 盒子宽度
         val cellSize = Size(cs, cs) // 格子宽度
@@ -145,7 +145,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
             pts = PositionTransformer(row, col, boxOffset, cs)
         }
         //endregion
-        //region 绘制栅格
+        //region: 绘制栅格
         translate(boxOffset.x, boxOffset.y) {
             // 大色块垫底
             drawRect(color = COLOR_CELL_HIDDEN.first, size = boxSize)

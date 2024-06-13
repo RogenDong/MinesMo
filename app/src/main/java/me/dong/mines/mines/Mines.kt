@@ -8,7 +8,6 @@ object Mines {
     val col get() = _width
     val row get() = _height
     val status get() = _status
-    private var initLogger = false
     private var _count = 10
     private var _width = 10
     private var _height = 10
@@ -53,10 +52,6 @@ object Mines {
      * @param height 高度/行数
      */
     fun newMap(count: Int, width: Int, height: Int) {
-        if (!initLogger) {
-            initLogger = true
-            rs.initLogger()
-        }
         _status = GameStatus.ReadyNew
         burstSet.clear()
         this._count = count
@@ -113,7 +108,7 @@ object Mines {
         val count = rs.revealAround(x, y)
         fetch()
         Log.i("app-jni", "newGame: count reveal cells: $count")
-        Log.d("app-jni", formatString())
+        Log.d("app-jni", rs.formatString() ?: "")
     }
 
     /**
@@ -172,7 +167,6 @@ object Mines {
         val count = rs.revealAround(x, y)
         Log.d("app-jni", "count reveal: $count")
         if (count > 0) fetch()
-        // TODO find burst (x,y)
         isAllReveal()
     }
 
@@ -189,20 +183,13 @@ object Mines {
     /**
      * 是否已揭露全部非地雷单位？
      */
-    fun isAllReveal(): Boolean {
+    private fun isAllReveal(): Boolean {
         val all = rs.isAllReveal()
         if (all) {
             _status = GameStatus.Swept
             burstSet.clear()
         }
         return all
-    }
-
-    /**
-     * 获取地图的格式化字符串
-     */
-    fun formatString(): String {
-        return rs.formatString() ?: ""
     }
 }
 
@@ -213,8 +200,6 @@ class MinesJNI {
             System.loadLibrary("mmrs")
         }
     }
-
-    external fun initLogger()
 
     /**
      * 初始化地图大小
