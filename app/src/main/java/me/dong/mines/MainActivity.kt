@@ -7,13 +7,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import me.dong.mines.mines.Mines
 import me.dong.mines.ui.theme.minesTheme
 
@@ -50,14 +61,46 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@SuppressLint("DefaultLocale")
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
+    class TT {
+        private var start: Long = 0
+        fun start() {
+            start = System.currentTimeMillis()
+        }
+
+        fun elapsed(): Long {
+            if (start == 0L) return 0
+            val now = System.currentTimeMillis()
+            if (now > start) return 0
+            val elapsed = now - start
+            if (elapsed <= 999000) return elapsed
+            start = now
+            return 0
+        }
+    }
+
+    val tt by remember { mutableStateOf(TT()) }
+//    tt.start()
     minesTheme {
-        Box(
-            modifier = Modifier.background(Color.Black),
-        ) {
+        Box(modifier = Modifier.background(brush = BRUSH_BG)) {
             GridCanvas(13, 28)
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val e = tt.elapsed()
+            Text(
+                text = String.format("⌛：%03d\t\t00/30", e),
+                textAlign = TextAlign.Center,
+                color = Color.White,
+            )
         }
     }
 }
