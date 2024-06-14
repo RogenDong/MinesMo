@@ -3,6 +3,8 @@ package me.dong.mines.mines
 import android.util.Log
 import androidx.annotation.Keep
 
+private const val TAG = "app-jni"
+
 object Mines {
     val count get() = _count
     val col get() = _width
@@ -42,6 +44,10 @@ object Mines {
         rawMap[i] = c.v
     }
 
+    /** 统计标记数量 */
+    fun countFlag() = rs.countFlagged()
+
+    /** 检查是否原爆点 */
     fun isBurst(x: Int, y: Int) = burstSet.contains(index(x, y))
 
     /**
@@ -73,14 +79,14 @@ object Mines {
             return
         }
         for (i in data.indices) {
-            val c = Cell(data[i])
+            val v = data[i]
+            val c = Cell(v)
             if (c.isMine() && c.isReveal() && _status == GameStatus.Playing) {
                 _status = GameStatus.Exploded
                 burstSet.add(i)
             }
-            rawMap[i] = data[i]
+            rawMap[i] = v
         }
-        isAllReveal()
     }
 
     /**
@@ -93,97 +99,75 @@ object Mines {
         }
     }
 
+    /** 准备新回合 */
     fun readyNew() {
         _status = GameStatus.ReadyNew
         burstSet.clear()
     }
 
-    /**
-     * 洗牌，开始新回合
-     */
+    /** 洗牌，开始新回合 */
     fun newGame(x: Int, y: Int) {
+        Log.d(TAG, "new game at(${x},${y})")
         _status = GameStatus.Playing
         burstSet.clear()
         rs.newGame(x, y)
         val count = rs.revealAround(x, y)
         fetch()
-        Log.i("app-jni", "newGame: count reveal cells: $count")
-        Log.d("app-jni", rs.formatString() ?: "")
+        Log.d(TAG, "newGame: count reveal cells: $count")
+        Log.d(TAG, rs.formatString() ?: "")
     }
 
-    /**
-     * 重置进度：清除开关、标记状态
-     */
-    fun resetProgress() {
-        _status = GameStatus.ReadyRetry
-        burstSet.clear()
-        rs.resetProgress()
-        fetch()
-    }
+//    /** 重置进度：清除开关、标记状态 */
+//    fun resetProgress() {
+//        _status = GameStatus.ReadyRetry
+//        burstSet.clear()
+//        rs.resetProgress()
+//        fetch()
+//    }
 
-    /**
-     * 切换标记
-     */
+    /** 切换标记 */
     fun switchFlag(x: Int, y: Int) {
         if (_status != GameStatus.Playing) return
         rs.switchFlag(x, y)
         update(x, y, Cell::switchFlag)
     }
 
-    /**
-     * 揭开隐藏单元
-     */
+    /** 揭开隐藏单元 */
     fun reveal(x: Int, y: Int) {
         val c = rawMap[x, y]
         if (c.isMine()) {
-            Log.d("app-jni", "reveal: burst at ($x,$y)")
+            Log.d(TAG, "reveal: burst at ($x,$y)")
             _status = GameStatus.Exploded
             burstSet.add(index(x, y))
-//            rs.revealAllMines()
-//            fetch()
             return
         }
         val count = rs.reveal(x, y)
+        Log.d(TAG, "count reveal: $count")
         if (count == 0) return
         if (count > 1) {
             fetch()
             return
         }
         update(x, y, Cell::reveal)
-        isAllReveal()
     }
 
-    /**
-     * 揭开周围一圈
-     */
+    /** 揭开周围一圈 */
     fun revealAround(x: Int, y: Int) {
         val cfa = rs.countFlaggedAround(x, y)
-        Log.d("app-jni", "count flagged around: $cfa")
+        Log.d(TAG, "count flagged around: $cfa")
         if (cfa == 0) return
         val cell = rawMap[x, y]
-        Log.d("app-jni", "cell warn: ${cell.getWarn()}")
+        Log.d(TAG, "cell warn: ${cell.getWarn()}")
         if (cfa < cell.getWarn().toInt()) return
 
         val count = rs.revealAround(x, y)
-        Log.d("app-jni", "count reveal: $count")
+        Log.d(TAG, "count reveal: $count")
         if (count > 0) fetch()
-        isAllReveal()
     }
 
-    /**
-     * 揭露所有地雷
-     */
-    fun revealAllMines() {
-        _status = GameStatus.Exploded
-//        _burst = INVALID_OFFSET
-        rs.revealAllMines()
-        fetch()
-    }
-
-    /**
-     * 是否已揭露全部非地雷单位？
-     */
-    private fun isAllReveal(): Boolean {
+    /** 是否已揭露全部非地雷单位？ */
+    fun isAllReveal(): Boolean {
+        if (_status == GameStatus.Swept) return true
         val all = rs.isAllReveal()
         if (all) {
             _status = GameStatus.Swept
@@ -194,7 +178,7 @@ object Mines {
 }
 
 @Keep
-class MinesJNI {
+private class MinesJNI {
     companion object {
         init {
             System.loadLibrary("mmrs")
@@ -217,10 +201,10 @@ class MinesJNI {
      */
     external fun newGame(x: Int, y: Int)
 
-    /**
-     * 重置进度：清除开关、标记状态
-     */
-    external fun resetProgress()
+//    /**
+//     * 重置进度：清除开关、标记状态
+//     */
+//    external fun resetProgress()
 
     /**
      * 切换标记
@@ -241,11 +225,6 @@ class MinesJNI {
     external fun countFlaggedAround(x: Int, y: Int): Int
 
     /**
-     * 揭露所有地雷
-     */
-    external fun revealAllMines()
-
-    /**
      * 是否已揭露全部非地雷单位？
      */
     external fun isAllReveal(): Boolean
@@ -258,8 +237,8 @@ class MinesJNI {
      */
     external fun formatString(): String?
 
-    /** 获取状态数据格式化字符串 */
-    external fun formatStatusString(): String?
+//    /** 获取状态数据格式化字符串 */
+//    external fun formatStatusString(): String?
 
     /**
      * 同步数据
