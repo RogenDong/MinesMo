@@ -56,10 +56,9 @@ class PositionTransformer(
     fun colRow(pos: Offset): IntOffset {
         if (pos.isUnspecified || !pos.isValid()) return INVALID_OFFSET
         var (x, y) = pos - offset
-        if (x < 0 || y < 0) return INVALID_OFFSET
+        if (x < 0 || y < 0 || x > width || y > height) return INVALID_OFFSET
         x -= round(x % cellSize)
         y -= round(y % cellSize)
-        if (x > width || y > height) return INVALID_OFFSET
         x = round(x / cellSize)
         y = round(y / cellSize)
         if (x > width || y > height) return INVALID_OFFSET
