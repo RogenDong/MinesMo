@@ -98,7 +98,7 @@ fun GreetingPreview() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "🎯：0/99",
+                text = "$CHAR_FLAG：0/99",
                 textAlign = TextAlign.Center,
                 color = txtColor,
             )

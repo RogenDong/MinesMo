@@ -39,6 +39,9 @@ import me.dong.mines.mines.GameStatus
 import me.dong.mines.mines.Mines
 import kotlin.math.round
 
+/** 标记符号 */
+const val CHAR_FLAG = "🚩"
+
 //val LIST_COLOR = arrayOf(
 //    Color(0xFF43B244),
 //    Color(0xFF20A162),
@@ -51,14 +54,14 @@ import kotlin.math.round
 
 /** 正确标记地雷色 */
 val COLOR_MINES_FLAGGED = Pair(
-    Color(0xFF53B254),
-    Color(0xFF23A124),
+    Color(0xFF75C274),
+    Color(0xFF55B254),
 )
 
 /** 隐藏地雷色 */
 val COLOR_MINES_HIDDEN = Pair(
-    Color(0xFFFF5050),
-    Color(0xFFFE4040),
+    Color(0xFFEE8080),
+    Color(0xFFEE6868),
 )
 
 /** 引爆地雷色 */
@@ -70,16 +73,10 @@ val COLOR_CELL_WRONG = Pair(
     Color(0xFF888888),
 )
 
-/** 标记色 */
-val COLOR_CELL_FLAG = Pair(
-    Color(0xFF29B7CB),
-    Color(0xFF19A7CA),
-)
-
 /** 已开单位颜色 */
 val COLOR_CELL_REVEAL = Pair(
-    Color(0xFFF7E8AA),
-    Color(0xFFF9D27D),
+    Color(0xFF82C5F5),
+    Color(0xFF62B5F5),
 )
 
 /** 未开单位颜色 */
@@ -87,6 +84,19 @@ val COLOR_CELL_HIDDEN = Pair(
     Color(0xFFAE92FA),
     Color(0xFF9E82F0)
 )
+
+//region 猜雷使用的颜色
+/** 可疑色 */
+val COLOR_GUESS = Pair(
+    Color(0xFFF7E8AA),
+    Color(0xFFF9D27D),
+)
+/** 死猜色 */
+val COLOR_FORCE = Pair(
+    Color(0xFFFE9659),
+    Color(0xFFeE8649),
+)
+//endregion
 
 val BRUSH_BG = Brush.linearGradient(
     listOf(
@@ -99,7 +109,7 @@ val BRUSH_BG = Brush.linearGradient(
 val STYLE_WRONG = TextStyle(fontSize = 18.sp, color = Color.White)
 val STYLE_TXT = TextStyle(fontSize = 18.sp)
 
-private operator fun <V> Pair<V, V>.get(b: Int, f: Int) = if (b and 1 != f) first else second
+operator fun <V> Pair<V, V>.get(b: Int, f: Int) = if (b and 1 != f) first else second
 
 private val watch = Watch()
 
@@ -170,6 +180,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
             val boxSize = Size(boxWidth, round(cs * row))// 盒子大小
             val boxOffset = Offset(round(cs / 2), round(cs * 2f))// 盒子偏移量
             val txtOffset = Offset(round(cs / 3.5f), round(cs / 30))// 文本偏移量
+            val flagOffset = Offset(round(cs / 9f), round(cs / 30))// 文本偏移量
             if (boxOffset != pts.offset || cs != pts.cellSize) {
                 pts = PositionTransformer(row, col, boxOffset, cs)
             }
@@ -209,6 +220,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                             if (!cell.isReveal()) {
                                 //region: 画标记单位
                                 if (cell.isFlagged()) {
+                                    //region: 画爆炸后的栅格
                                     if (Mines.status == GameStatus.Exploded) {
                                         if (cell.isMine()) {
                                             //region: 画找到的地雷
@@ -236,11 +248,23 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                                         }
                                         continue
                                     }
-                                    drawRect(
-                                        size = cellSize,
-                                        topLeft = cellOffset,
-                                        color = COLOR_CELL_FLAG[x, flag],
+                                    //endregion
+                                    //region: 常规栅格+标记符号
+                                    if ((x and 1) != flag) {
+                                        drawRect(
+                                            size = cellSize,
+                                            topLeft = cellOffset,
+                                            color = COLOR_CELL_HIDDEN.second,
+                                        )
+                                    }
+                                    drawText(
+                                        textLayoutResult = wrongTxtMeasurer.measure(
+                                            style = STYLE_TXT,
+                                            text = CHAR_FLAG,
+                                        ),
+                                        topLeft = cellOffset + flagOffset,
                                     )
+                                    //endregion
                                 }
                                 //endregion
                                 //region: 画未找到的地雷
@@ -300,7 +324,7 @@ fun MinesCanvas(modifier: Modifier = Modifier) {
                     else {
                         Mines.switchFlag(x, y)
                         val f = Mines.countFlag()
-                        txtCount = "🎯：$f/${Mines.count}"
+                        txtCount = "$CHAR_FLAG：$f/${Mines.count}"
                     }
                     Mines.isAllReveal()
                     when (Mines.status) {
