@@ -13,20 +13,23 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import kotlin.math.round
 
-/**
- * 绘制栅格
- */
+private val LS_COLOR = listOf(
+    COLOR_CELL_REVEAL,
+    COLOR_MINES_FLAGGED,
+    COLOR_MINES_HIDDEN,
+    COLOR_CELL_WRONG,
+    COLOR_GUESS,
+    COLOR_FORCE,
+)
+
+/** 绘制栅格 */
 @Composable
-fun GridCanvas(col: Int = 13, row: Int = 28, modifier: Modifier = Modifier) {
+fun GridCanvas(col: Int = 13, row: Int = 28) {
+    val wrongTxtMeasurer = rememberTextMeasurer()
     val textStyle = TextStyle(fontSize = 18.sp)
     val txtMeasurer = rememberTextMeasurer()
-    // 未开单位颜色
-//    val COLOR_CELL_HIDDEN = Pair(
-//        Color(0xFFAE92FA),
-//        Color(0xFF9E82F0)
-//    )
 
-    Canvas(modifier = modifier.fillMaxSize()) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
         //region 计算宽高
         val cs = round(size.width / (col + 1))
         val boxWidth = round(cs * col) // 盒子宽度
@@ -34,6 +37,7 @@ fun GridCanvas(col: Int = 13, row: Int = 28, modifier: Modifier = Modifier) {
         val boxSize = Size(boxWidth, round(cs * row))// 盒子大小
         val boxOffset = Offset(round(cs / 2), round(cs * 2f))// 盒子偏移量
         val txtOffset = Offset(round(cs / 3.5f), round(cs / 30))// 文本偏移量
+        val flagOffset = Offset(round(cs / 9f), round(cs / 30))// 文本偏移量
         //endregion
         //region 绘制栅格
         translate(boxOffset.x, boxOffset.y) {
@@ -45,14 +49,32 @@ fun GridCanvas(col: Int = 13, row: Int = 28, modifier: Modifier = Modifier) {
                 translate(top = round(cs * y)) {
                     for (x in 0..<col) {
                         val cellOffset = Offset(round(cs * x), 0f)
-                        //region: 画栅格
-                        if ((x and 1) != flag) {
-                            drawRect(
-                                size = cellSize,
-                                topLeft = cellOffset,
-                                color = COLOR_CELL_HIDDEN.second,
+                        val c = (if (y in 0..5) LS_COLOR[y] else COLOR_CELL_HIDDEN)[x, flag]
+                        drawRect(
+                            topLeft = cellOffset,
+                            size = cellSize,
+                            color = c,
+                        )
+                        //region base: 画栅格
+//                        if ((x and 1) != flag) {
+//                            drawRect(
+//                                size = cellSize,
+//                                topLeft = cellOffset,
+//                                color = c,
+//                            )
+//                        }
+                        //endregion
+                        //region flagged: 标记符号
+                        if (y == 1 && x > 0) {
+                            drawText(
+                                textLayoutResult = wrongTxtMeasurer.measure(
+                                    style = STYLE_TXT,
+                                    text = CHAR_FLAG,
+                                ),
+                                topLeft = cellOffset + flagOffset,
                             )
                         }
+                        //endregion
                         //region: 画行列数
                         if (x < 1) {
                             drawText(
@@ -76,8 +98,7 @@ fun GridCanvas(col: Int = 13, row: Int = 28, modifier: Modifier = Modifier) {
                 }// translate(top = cs * y)
                 flag = if (flag == 0) 1 else 0
             }//endregion for (y in 0..<Mines.row)
-        }// translate(boxOffset.x, boxOffset.y)
-        //endregion
+        }//endregion translate(boxOffset.x, boxOffset.y)
     }
 }
 
